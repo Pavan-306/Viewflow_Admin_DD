@@ -148,20 +148,20 @@ class TicketProcess(Process):
     ticket_data = jsonstore.JSONField(default=dict)
 
     # Decisions/comments per stage
-    user_decision = jsonstore.CharField(max_length=10, blank=True)
-    dev_decision = jsonstore.CharField(max_length=10, blank=True)
-    ba_decision = jsonstore.CharField(max_length=10, blank=True)
-    pm_decision = jsonstore.CharField(max_length=10, blank=True)
+    user_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Representative decision")
+    dev_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Champion decision")
+    ba_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Approver decision")
+    pm_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="CRO decision")
 
-    approved_by_user = jsonstore.CharField(max_length=100, blank=True)
-    approved_by_dev = jsonstore.CharField(max_length=100, blank=True)
-    approved_by_ba = jsonstore.CharField(max_length=100, blank=True)
-    approved_by_pm = jsonstore.CharField(max_length=100, blank=True)
+    approved_by_user = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Representative")
+    approved_by_dev = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Champion")
+    approved_by_ba = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Approver")
+    approved_by_pm = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by CRO")
 
-    user_comment = jsonstore.TextField(blank=True)
-    dev_comment = jsonstore.TextField(blank=True)
-    ba_comment = jsonstore.TextField(blank=True)
-    pm_comment = jsonstore.TextField(blank=True)
+    user_comment = jsonstore.TextField(blank=True, verbose_name="Risk Representative comment")
+    dev_comment = jsonstore.TextField(blank=True, verbose_name="Risk Champion comment")
+    ba_comment = jsonstore.TextField(blank=True, verbose_name="Risk Approver comment")
+    pm_comment = jsonstore.TextField(blank=True, verbose_name="CRO comment")
 
     def __str__(self):
         return f"TicketProcess for {self.form.name}"
