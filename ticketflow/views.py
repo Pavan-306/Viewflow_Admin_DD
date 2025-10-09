@@ -1,5 +1,7 @@
+# ticketflow/views.py
 from django import forms
 from django.core.mail import EmailMultiAlternatives
+from django.views.generic import ListView, RedirectView
 from viewflow.workflow.flow.views import CreateProcessView, UpdateProcessView
 
 from .models import (
@@ -22,20 +24,18 @@ ROLE_DISPLAY = {
 
 
 def _values_map_for_entry(entry: FormEntry) -> dict[int, str]:
-    """Return {field_id -> string value or filename} for current entry."""
-    out: dict[int, str] = {}
+    out = {}
     for v in entry.values.all():
         out[v.field_id] = v.value_text or (v.value_file.name if v.value_file else "")
     return out
 
 
 def build_ticket_summary_html(process: TicketProcess) -> str:
-    """Build an HTML table in form field order with latest values."""
     if not process.entry:
         return "<p><em>No data yet</em></p>"
 
     values_map = _values_map_for_entry(process.entry)
-    rows: list[str] = []
+    rows = []
     for ff in process.form.fields.all():
         val = values_map.get(ff.id, "")
         rows.append(
@@ -50,15 +50,8 @@ def build_ticket_summary_html(process: TicketProcess) -> str:
 
 
 def _update_entry_values_for_role(
-    entry: FormEntry,
-    form_obj: FormModel,
-    cleaned_data: dict,
-    files,
-    role: str,
-) -> None:
-    """
-    Persist values for fields that belong to `role` into FormEntryValue.
-    """
+    entry: FormEntry, form_obj: FormModel, cleaned_data: dict, files, role: str
+):
     for ff in form_obj.fields.filter(role=role):
         key = str(ff.id)
         if ff.field_type == FormField.FILE:
@@ -77,8 +70,7 @@ def _update_entry_values_for_role(
 
 
 def _snapshot_from_entry(entry: FormEntry) -> dict:
-    """Flatten values into a {label: value} dict for quick display/email."""
-    snap: dict[str, str] = {}
+    snap = {}
     for ff in entry.form.fields.all():
         try:
             v = entry.values.get(field=ff)
@@ -88,10 +80,7 @@ def _snapshot_from_entry(entry: FormEntry) -> dict:
     return snap
 
 
-def send_submission_emails(process: TicketProcess, subject_prefix: str = "New submission") -> None:
-    """
-    Email notify_emails (console backend in dev) with an HTML table snapshot.
-    """
+def send_submission_emails(process: TicketProcess, subject_prefix="New submission"):
     form_obj = process.form
     emails = [e.strip() for e in (form_obj.notify_emails or "").split(",") if e.strip()]
     if not emails:
@@ -99,8 +88,7 @@ def send_submission_emails(process: TicketProcess, subject_prefix: str = "New su
 
     subject = f"{subject_prefix}: {form_obj.name}"
     rows = "".join(
-        f"<tr><th align='left' style='padding:6px 10px'>{k}</th>"
-        f"<td style='padding:6px 10px'>{v}</td></tr>"
+        f"<tr><th align='left' style='padding:6px 10px'>{k}</th><td style='padding:6px 10px'>{v}</td></tr>"
         for k, v in (process.ticket_data or {}).items()
     )
     html = f"""
@@ -115,10 +103,10 @@ def send_submission_emails(process: TicketProcess, subject_prefix: str = "New su
     msg.send(fail_silently=True)
 
 
+# -----------------------------------------------------
+#  DYNAMIC START VIEW (existing)
+# -----------------------------------------------------
 class DynamicStartView(CreateProcessView):
-    """
-    Start step: shows only 'User/Risk Representative' fields (plus the 'form' selector).
-    """
     model = TicketProcess
 
     def get_form_class(self):
@@ -138,23 +126,18 @@ class DynamicStartView(CreateProcessView):
                     except FormModel.DoesNotExist:
                         form_obj = None
                 if form_obj:
-                    # Requester stage
                     add_fields_to_form(self, form_obj, role=FormField.ROLE_USER)
 
         return StartForm
 
 
+# -----------------------------------------------------
+#  APPROVAL VIEW (FOR ALL STAGES) (existing)
+# -----------------------------------------------------
 class ApprovalView(UpdateProcessView):
-    """
-    Approval step for a given role:
-    - shows read-only summary of all values so far
-    - shows only this role's fields to fill/edit (EXCLUDING 'Description')
-    - sets 'Summary' textarea same size as the comment box on every stage
-    - has Approve / Reject buttons (no radio)
-    """
     model = TicketProcess
     template_name = "viewflow/workflow/task.html"
-    role = None  # set via .as_view(role="user"/"dev"/"ba"/"pm")
+    role = None  # set via as_view(role="user"/"dev"/"ba"/"pm")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -165,9 +148,9 @@ class ApprovalView(UpdateProcessView):
         ctx["role_display"] = ROLE_DISPLAY.get(role, role)
         ctx["status_row"] = {
             ROLE_DISPLAY["user"]: (self.object.user_decision or "-"),
-            ROLE_DISPLAY["dev"]:  (self.object.dev_decision or "-"),
-            ROLE_DISPLAY["ba"]:   (self.object.ba_decision or "-"),
-            ROLE_DISPLAY["pm"]:   (self.object.pm_decision or "-"),
+            ROLE_DISPLAY["dev"]: (self.object.dev_decision or "-"),
+            ROLE_DISPLAY["ba"]: (self.object.ba_decision or "-"),
+            ROLE_DISPLAY["pm"]: (self.object.pm_decision or "-"),
         }
         return ctx
 
@@ -188,11 +171,11 @@ class ApprovalView(UpdateProcessView):
                 initial_map = {}
                 if process.entry:
                     for v in process.entry.values.all():
-                        initial_map[str(v.field_id)] = (
-                            v.value_text or (v.value_file.name if v.value_file else "")
+                        initial_map[str(v.field_id)] = v.value_text or (
+                            v.value_file.name if v.value_file else ""
                         )
 
-                # Exclude the "Description" field in *all* approval screens
+                # Exclude Description for all approval stages
                 add_fields_to_form(
                     self,
                     form_obj,
@@ -206,16 +189,8 @@ class ApprovalView(UpdateProcessView):
                 self.fields[comment_field].label = lbl
                 self.fields[comment_field].help_text = ""
                 self.fields[comment_field].widget = forms.Textarea(
-                    attrs={"rows": 7, "style": "width:100%"}
+                    attrs={"rows": 6, "style": "width:100%"}
                 )
-
-                # Make "Summary" look like the comment box (same size)
-                for name, field in list(self.fields.items()):
-                    if getattr(field, "label", "") == "Summary":
-                        field.widget = forms.Textarea(
-                            attrs={"rows": 7, "style": "width:100%"}
-                        )
-                        break
 
         return _Form
 
@@ -223,29 +198,53 @@ class ApprovalView(UpdateProcessView):
         process = form.instance
         role = self.role or self.kwargs.get("role")
 
-        # Decision comes from buttons: name="decision" value="approved/rejected"
         decision = self.request.POST.get("decision")
         if decision not in ("approved", "rejected"):
             form.add_error(None, "Please click Approve or Reject.")
             return self.form_invalid(form)
 
-        # Ensure there is a master entry
         if not process.entry:
             process.entry = FormEntry.objects.create(
                 form=process.form, submitted_by=self.request.user
             )
 
-        # Save this role's field values
         _update_entry_values_for_role(
             process.entry, process.form, form.cleaned_data, self.request.FILES, role
         )
-
-        # Refresh snapshot for quick display/email
         process.ticket_data = _snapshot_from_entry(process.entry)
 
-        # Save decision & approver
         setattr(process, f"{role}_decision", decision)
         setattr(process, f"approved_by_{role}", self.request.user.get_username())
         process.save()
 
         return super().form_valid(form)
+
+
+# =====================================================
+#  NEW: Dynamic Application Views (for the /grc tile)
+# =====================================================
+class FormListView(ListView):
+    """
+    Lists Forms that have a WorkflowTemplate linked.
+    Used by the 'GRC Dynamic Requests' application tile (/grc/).
+    """
+    template_name = "grc/form_list.html"
+    context_object_name = "forms"
+
+    def get_queryset(self):
+        return FormModel.objects.filter(workflow_template__isnull=False).order_by("name")
+
+
+class StartFromTemplateView(RedirectView):
+    """
+    Redirect to the REAL Viewflow start URL and pass the selected form id.
+    This avoids using CreateProcessView outside of an activation.
+    """
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        form_pk = kwargs["pk"]
+        # Viewflow app is mounted under /ticketflow/, flow slug is "ticket"
+        # (you already have URLs like /ticketflow/ticket/... in your project)
+        start_url = "/ticketflow/ticket/start/"
+        return f"{start_url}?form={form_pk}"

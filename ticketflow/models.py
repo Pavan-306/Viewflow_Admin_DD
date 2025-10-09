@@ -1,8 +1,10 @@
-# ticketflow/models.py
 from django.conf import settings
 from django.db import models
 from viewflow.workflow.models import Process
 from viewflow import jsonstore
+
+# 👇 If your WorkflowTemplate is in a different module, change this import
+from .dynamic_models import WorkflowTemplate
 
 
 class Form(models.Model):
@@ -12,6 +14,16 @@ class Form(models.Model):
         help_text="Comma-separated emails to notify when this form is submitted",
     )
     created = models.DateTimeField(auto_now_add=True)
+
+    # NEW: default template to use for processes started with this form
+    workflow_template = models.ForeignKey(
+        WorkflowTemplate,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="default_for_forms",
+        help_text="If set, new requests with this form will use this workflow template by default.",
+    )
 
     def __str__(self):
         return self.name
@@ -58,9 +70,7 @@ class FormField(models.Model):
     form = models.ForeignKey(Form, related_name="fields", on_delete=models.CASCADE)
 
     label = models.CharField(max_length=200)
-    field_type = models.CharField(
-        max_length=20, choices=FIELD_TYPES, default=TEXT
-    )
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPES, default=TEXT)
     required = models.BooleanField(default=False)
     help_text = models.CharField(max_length=300, blank=True)
     choices = models.TextField(
@@ -71,9 +81,7 @@ class FormField(models.Model):
     order = models.PositiveIntegerField(default=0)
 
     # Which stage fills this field
-    role = models.CharField(
-        max_length=10, choices=ROLE_CHOICES, default=ROLE_USER
-    )
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_USER)
 
     placeholder = models.CharField(
         max_length=200, blank=True, help_text="Placeholder for inputs", default=""
@@ -86,9 +94,7 @@ class FormField(models.Model):
     regex = models.CharField(
         max_length=200, blank=True, help_text="Optional regex validation", default=""
     )
-    readonly = models.BooleanField(
-        default=False, help_text="Show as read-only"
-    )
+    readonly = models.BooleanField(default=False, help_text="Show as read-only")
     hidden = models.BooleanField(
         default=False, help_text="Hide field in forms (but store value if present)"
     )
@@ -101,14 +107,9 @@ class FormField(models.Model):
 
 
 class FormEntry(models.Model):
-    form = models.ForeignKey(
-        Form, related_name="entries", on_delete=models.CASCADE
-    )
+    form = models.ForeignKey(Form, related_name="entries", on_delete=models.CASCADE)
     submitted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
 
@@ -122,14 +123,10 @@ class FormEntryValue(models.Model):
     )
     field = models.ForeignKey(FormField, on_delete=models.CASCADE)
     value_text = models.TextField(blank=True)
-    value_file = models.FileField(
-        upload_to="form_uploads/", null=True, blank=True
-    )
+    value_file = models.FileField(upload_to="form_uploads/", null=True, blank=True)
 
     def __str__(self):
-        val = self.value_text or (
-            self.value_file.name if self.value_file else ""
-        )
+        val = self.value_text or (self.value_file.name if self.value_file else "")
         return f"{self.field.label} = {val}"
 
 
@@ -148,20 +145,31 @@ class TicketProcess(Process):
     ticket_data = jsonstore.JSONField(default=dict)
 
     # Decisions/comments per stage
-    user_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Representative decision")
-    dev_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Champion decision")
-    ba_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="Risk Approver decision")
-    pm_decision = jsonstore.CharField(max_length=10, blank=True, verbose_name="CRO decision")
+    user_decision = jsonstore.CharField(max_length=10, blank=True)
+    dev_decision = jsonstore.CharField(max_length=10, blank=True)
+    ba_decision = jsonstore.CharField(max_length=10, blank=True)
+    pm_decision = jsonstore.CharField(max_length=10, blank=True)
 
-    approved_by_user = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Representative")
-    approved_by_dev = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Champion")
-    approved_by_ba = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by Risk Approver")
-    approved_by_pm = jsonstore.CharField(max_length=100, blank=True, verbose_name="Approved by CRO")
+    approved_by_user = jsonstore.CharField(max_length=100, blank=True)
+    approved_by_dev = jsonstore.CharField(max_length=100, blank=True)
+    approved_by_ba = jsonstore.CharField(max_length=100, blank=True)
+    approved_by_pm = jsonstore.CharField(max_length=100, blank=True)
 
-    user_comment = jsonstore.TextField(blank=True, verbose_name="Risk Representative comment")
-    dev_comment = jsonstore.TextField(blank=True, verbose_name="Risk Champion comment")
-    ba_comment = jsonstore.TextField(blank=True, verbose_name="Risk Approver comment")
-    pm_comment = jsonstore.TextField(blank=True, verbose_name="CRO comment")
+    user_comment = jsonstore.TextField(blank=True)
+    dev_comment = jsonstore.TextField(blank=True)
+    ba_comment = jsonstore.TextField(blank=True)
+    pm_comment = jsonstore.TextField(blank=True)
+
+    # (Optional) if you also added a workflow_template FK on TicketProcess itself
+    # add it here; if not needed, ignore.
+    workflow_template = models.ForeignKey(
+        WorkflowTemplate,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processes",
+        help_text="Template that defined this process route.",
+    )
 
     def __str__(self):
         return f"TicketProcess for {self.form.name}"
