@@ -1,9 +1,12 @@
+# ticketflow/models.py
 from django.conf import settings
 from django.db import models
 from viewflow.workflow.models import Process
 from viewflow import jsonstore
 
-# 👇 If your WorkflowTemplate is in a different module, change this import
+# If your dynamic workflow models are present, import them.
+# If you don't use dynamic workflows, you can safely remove this import
+# and the related FKs below.
 from .dynamic_models import WorkflowTemplate
 
 
@@ -15,7 +18,7 @@ class Form(models.Model):
     )
     created = models.DateTimeField(auto_now_add=True)
 
-    # NEW: default template to use for processes started with this form
+    # Default template to use for processes started with this form
     workflow_template = models.ForeignKey(
         WorkflowTemplate,
         null=True,
@@ -25,12 +28,12 @@ class Form(models.Model):
         help_text="If set, new requests with this form will use this workflow template by default.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 class FormField(models.Model):
-    # Field types
+    # -------- Field types --------
     TEXT = "text"
     TEXTAREA = "textarea"
     SELECT = "select"
@@ -53,13 +56,13 @@ class FormField(models.Model):
         (RADIO, "Radio"),
     ]
 
-    # Role keys (internal, do not change)
+    # -------- Role keys (internal, do not change) --------
     ROLE_USER = "user"
     ROLE_DEV = "dev"
     ROLE_BA = "ba"
     ROLE_PM = "pm"
 
-    # Visible labels (your requested names)
+    # -------- Visible role labels --------
     ROLE_CHOICES = [
         (ROLE_USER, "Risk Representative"),
         (ROLE_DEV, "Risk Champion"),
@@ -102,7 +105,7 @@ class FormField(models.Model):
     class Meta:
         ordering = ["order", "id"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.form.name} / {self.label}"
 
 
@@ -113,7 +116,7 @@ class FormEntry(models.Model):
     )
     submitted_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Entry #{self.id} / {self.form.name}"
 
 
@@ -125,13 +128,14 @@ class FormEntryValue(models.Model):
     value_text = models.TextField(blank=True)
     value_file = models.FileField(upload_to="form_uploads/", null=True, blank=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         val = self.value_text or (self.value_file.name if self.value_file else "")
         return f"{self.field.label} = {val}"
 
 
 class TicketProcess(Process):
     form = models.ForeignKey(Form, on_delete=models.PROTECT)
+
     # One unified entry over the whole flow
     entry = models.OneToOneField(
         FormEntry,
@@ -141,7 +145,8 @@ class TicketProcess(Process):
         related_name="ticket_process",
     )
 
-    # Snapshot for quick display/emails
+    # ✅ Snapshot for quick display/emails and to prefill at later stages
+    # Using viewflow.jsonstore.JSONField keeps compatibility with your project.
     ticket_data = jsonstore.JSONField(default=dict)
 
     # Decisions/comments per stage
@@ -160,8 +165,7 @@ class TicketProcess(Process):
     ba_comment = jsonstore.TextField(blank=True)
     pm_comment = jsonstore.TextField(blank=True)
 
-    # (Optional) if you also added a workflow_template FK on TicketProcess itself
-    # add it here; if not needed, ignore.
+    # Optional: template used for this particular process instance
     workflow_template = models.ForeignKey(
         WorkflowTemplate,
         null=True,
@@ -171,5 +175,5 @@ class TicketProcess(Process):
         help_text="Template that defined this process route.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"TicketProcess for {self.form.name}"

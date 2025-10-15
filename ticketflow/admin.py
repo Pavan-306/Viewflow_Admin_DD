@@ -1,19 +1,54 @@
+# ticketflow/admin.py
 from django.contrib import admin
-from .models import (
-    Form,
-    FormField,
-    FormEntry,
-    FormEntryValue,
-    TicketProcess,
-)
+from django.utils.html import format_html
 
-# Dynamic workflow admin
-from .dynamic_models import WorkflowTemplate, WorkflowStage
+from .models import Form, FormField, FormEntry, FormEntryValue, TicketProcess
+
+try:
+    from .dynamic_models import WorkflowTemplate, WorkflowStage
+except Exception:
+    WorkflowTemplate = WorkflowStage = None
 
 
-# =========================
-#  FORM ADMIN
-# =========================
+class FormFieldInline(admin.TabularInline):
+    model = FormField
+    extra = 0
+    ordering = ("order", "id")
+    fields = (
+        "drag",
+        "label",
+        "field_type",
+        "required",
+        "help_text",
+        "choices",
+        "max_length",
+        "role",
+        "placeholder",
+        "readonly",
+        "hidden",
+    )
+    readonly_fields = ("drag",)
+
+    def drag(self, obj=None):
+        return format_html('<span class="drag-handle" title="Drag to reorder">⋮⋮</span>')
+
+    drag.short_description = ""
+
+    class Media:
+        # NOTE: no ?v=1 here – Django will URL-encode it and break the path.
+        css = {
+            "all": (
+                "ticketflow/admin-inline-compact.v2.css",
+                "ticketflow/admin-field-sizes.css",
+                "ticketflow/admin-inline-force.v1.css",   # compact widths / hide order
+            )
+        }
+        js = (
+            "ticketflow/admin-sortable-inline.js",
+            "ticketflow/admin-inline-mark.js",  # adds “⋮⋮” handle & drag cursor
+        )
+
+
 @admin.register(Form)
 class FormAdmin(admin.ModelAdmin):
     list_display = ("name", "workflow_template", "created")
@@ -23,16 +58,9 @@ class FormAdmin(admin.ModelAdmin):
         (None, {"fields": ("name", "workflow_template")}),
         ("Notifications", {"fields": ("notify_emails",)}),
     )
+    inlines = [FormFieldInline]
 
 
-class FormFieldInline(admin.TabularInline):
-    model = FormField
-    extra = 0
-
-
-# =========================
-#  FORM ENTRY ADMIN
-# =========================
 @admin.register(FormEntry)
 class FormEntryAdmin(admin.ModelAdmin):
     list_display = ("id", "form", "submitted_by", "submitted_at")
@@ -46,45 +74,21 @@ class FormEntryValueAdmin(admin.ModelAdmin):
     search_fields = ("entry__id", "field__label", "value_text")
 
 
-# =========================
-#  TICKET PROCESS ADMIN
-# =========================
 @admin.register(TicketProcess)
 class TicketProcessAdmin(admin.ModelAdmin):
-    """
-    Note:
-    - 'is_finished' is NOT a model field; we expose a computed boolean column instead.
-    """
-    list_display = (
-        "id",
-        "form",
-        "workflow_template",
-        "created",
-        "finished",
-        "get_is_finished",   # <- computed column (replaces 'is_finished')
-    )
+    list_display = ("id", "form", "workflow_template", "created", "finished")
     list_filter = ("form", "workflow_template")
     search_fields = ("id", "form__name")
-    readonly_fields = ()
-
-    @admin.display(boolean=True, description="Finished?")
-    def get_is_finished(self, obj: TicketProcess) -> bool:
-        """
-        Consider the process 'finished' if the 'finished' datetime is set.
-        """
-        return bool(getattr(obj, "finished", None))
 
 
-# =========================
-#  WORKFLOW TEMPLATE ADMIN
-# =========================
-class WorkflowStageInline(admin.TabularInline):
-    model = WorkflowStage
-    extra = 0
+if WorkflowTemplate and WorkflowStage:
+    class WorkflowStageInline(admin.TabularInline):
+        model = WorkflowStage
+        extra = 0
+        ordering = ("order", "id")
 
-
-@admin.register(WorkflowTemplate)
-class WorkflowTemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "updated", "created")
-    search_fields = ("name",)
-    inlines = [WorkflowStageInline]
+    @admin.register(WorkflowTemplate)
+    class WorkflowTemplateAdmin(admin.ModelAdmin):
+        list_display = ("name", "updated", "created")
+        search_fields = ("name",)
+        inlines = [WorkflowStageInline]

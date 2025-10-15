@@ -110,3 +110,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 # --- EMAIL (DEV ONLY: prints emails in the console) ---
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@example.com"
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STATICFILES_DIRS = [
+    BASE_DIR / "ticketflow" / "static",
+]

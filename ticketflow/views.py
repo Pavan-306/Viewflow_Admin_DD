@@ -104,7 +104,7 @@ def send_submission_emails(process: TicketProcess, subject_prefix="New submissio
 
 
 # -----------------------------------------------------
-#  DYNAMIC START VIEW (existing)
+#  DYNAMIC START VIEW
 # -----------------------------------------------------
 class DynamicStartView(CreateProcessView):
     model = TicketProcess
@@ -126,13 +126,48 @@ class DynamicStartView(CreateProcessView):
                     except FormModel.DoesNotExist:
                         form_obj = None
                 if form_obj:
+                    # Show only Risk Representative fields at start
                     add_fields_to_form(self, form_obj, role=FormField.ROLE_USER)
 
         return StartForm
 
+    def form_valid(self, form):
+        # Let Viewflow save the process with the selected Form
+        response = super().form_valid(form)
+        process: TicketProcess = self.object
+        form_obj = process.form
+
+        # Ensure we have a single entry for the entire flow
+        if not process.entry:
+            process.entry = FormEntry.objects.create(
+                form=form_obj,
+                submitted_by=self.request.user if self.request.user.is_authenticated else None,
+            )
+
+        # Save user-stage dynamic fields into the entry
+        _update_entry_values_for_role(
+            entry=process.entry,
+            form_obj=form_obj,
+            cleaned_data=form.cleaned_data,
+            files=self.request.FILES,
+            role=FormField.ROLE_USER,
+        )
+
+        # Prepare a snapshot (will persist if your model has ticket_data)
+        process.ticket_data = _snapshot_from_entry(process.entry)
+
+        # IMPORTANT: do not include 'ticket_data' in update_fields
+        try:
+            process.save(update_fields=["entry"])
+        except ValueError:
+            # If update_fields complains for any reason, fall back to a plain save
+            process.save()
+
+        return response
+
 
 # -----------------------------------------------------
-#  APPROVAL VIEW (FOR ALL STAGES) (existing)
+#  APPROVAL VIEW (FOR ALL STAGES)
 # -----------------------------------------------------
 class ApprovalView(UpdateProcessView):
     model = TicketProcess
@@ -213,6 +248,7 @@ class ApprovalView(UpdateProcessView):
         )
         process.ticket_data = _snapshot_from_entry(process.entry)
 
+        # Save without specifying update_fields (avoids the ticket_data problem)
         setattr(process, f"{role}_decision", decision)
         setattr(process, f"approved_by_{role}", self.request.user.get_username())
         process.save()
@@ -221,7 +257,7 @@ class ApprovalView(UpdateProcessView):
 
 
 # =====================================================
-#  NEW: Dynamic Application Views (for the /grc tile)
+#  Dynamic Application Views (for the /grc tile)
 # =====================================================
 class FormListView(ListView):
     """
