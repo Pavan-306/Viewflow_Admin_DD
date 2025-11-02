@@ -8,7 +8,11 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
+<<<<<<< HEAD
 set VIRTUAL_ENV=C:\Users\pavan\Viewflow_Admin_DD-main\venv
+=======
+set VIRTUAL_ENV=C:\Users\Admin\Viewflow_DF_1\venv
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
 
 if not defined PROMPT set PROMPT=$P$G
 

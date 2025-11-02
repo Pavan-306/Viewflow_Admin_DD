@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 console.log("✅ TicketFlow sortable script loaded");
 window.__tf_test = true;
 
@@ -88,4 +89,71 @@ function initTicketFlowDrag() {
 // Run after DOM ready (also works for new admin React load timing)
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(initTicketFlowDrag, 1000);
+=======
+// Lightweight drag & drop for Django tabular inlines
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".inline-group").forEach(function (group) {
+    // Only activate when our handle exists (this is the FormField inline)
+    if (!group.querySelector(".drag-handle")) return;
+
+    const tbody = group.querySelector("tbody");
+    if (!tbody) return;
+
+    let draggingRow = null;
+
+    // Make all inline rows draggable
+    tbody.querySelectorAll("tr.form-row").forEach(prepareRow);
+
+    function prepareRow(row) {
+      row.setAttribute("draggable", "true");
+
+      row.addEventListener("dragstart", function (e) {
+        draggingRow = row;
+        row.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+
+      row.addEventListener("dragover", function (e) {
+        e.preventDefault(); // allow drop
+        const target = closestRow(e.target);
+        if (!target || target === draggingRow) return;
+
+        const rect = target.getBoundingClientRect();
+        const after = (e.clientY - rect.top) > rect.height / 2;
+        tbody.insertBefore(draggingRow, after ? target.nextSibling : target);
+      });
+
+      row.addEventListener("dragend", function () {
+        row.classList.remove("dragging");
+        draggingRow = null;
+        renumber();
+      });
+
+      // Only start dragging when user grabs the handle (feel nicer)
+      const handle = row.querySelector(".drag-handle");
+      if (handle) {
+        handle.addEventListener("mousedown", function () {
+          row.setAttribute("draggable", "true");
+        });
+        handle.addEventListener("mouseup", function () {
+          row.removeAttribute("draggable"); // prevent accidental drags via inputs
+        });
+      }
+    }
+
+    function closestRow(el) {
+      while (el && el.tagName !== "TR") el = el.parentElement;
+      return el && el.classList.contains("form-row") ? el : null;
+    }
+
+    // Write sequential values into the hidden "order" inputs
+    function renumber() {
+      const rows = tbody.querySelectorAll("tr.form-row");
+      rows.forEach(function (row, idx) {
+        const orderInput = row.querySelector('input[name$="-order"]');
+        if (orderInput) orderInput.value = String(idx + 1);
+      });
+    }
+  });
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
 });

@@ -1,16 +1,27 @@
 # ticketflow/admin.py
+<<<<<<< HEAD
 from django import forms
+=======
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
 from django.contrib import admin
 from django.utils.html import format_html
 
 from .models import Form, FormField, FormEntry, FormEntryValue, TicketProcess
+<<<<<<< HEAD
 try:
     from .dynamic_models import WorkflowTemplate, WorkflowStage
 except Exception:  # pragma: no cover
+=======
+
+try:
+    from .dynamic_models import WorkflowTemplate, WorkflowStage
+except Exception:
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
     WorkflowTemplate = WorkflowStage = None
 
 
 class FormFieldInline(admin.TabularInline):
+<<<<<<< HEAD
     """
     Tabular inline with a drag handle. We KEEP the 'order' form field but hide
     its widget so our JS can update it on drag and Django will persist it.
@@ -26,11 +37,29 @@ class FormFieldInline(admin.TabularInline):
         "max_length", "role", "placeholder",
         "readonly", "hidden",
         "order",  # keep in the form; we will hide with a HiddenInput
+=======
+    model = FormField
+    extra = 0
+    ordering = ("order", "id")
+    fields = (
+        "drag",
+        "label",
+        "field_type",
+        "required",
+        "help_text",
+        "choices",
+        "max_length",
+        "role",
+        "placeholder",
+        "readonly",
+        "hidden",
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
     )
     readonly_fields = ("drag",)
 
     def drag(self, obj=None):
         return format_html('<span class="drag-handle" title="Drag to reorder">⋮⋮</span>')
+<<<<<<< HEAD
     drag.short_description = ""
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
@@ -52,6 +81,23 @@ class FormFieldInline(admin.TabularInline):
         js = (
             "ticketflow/admin-inline-mark.js",
             "ticketflow/admin-sortable-inline.js",
+=======
+
+    drag.short_description = ""
+
+    class Media:
+        # NOTE: no ?v=1 here – Django will URL-encode it and break the path.
+        css = {
+            "all": (
+                "ticketflow/admin-inline-compact.v2.css",
+                "ticketflow/admin-field-sizes.css",
+                "ticketflow/admin-inline-force.v1.css",   # compact widths / hide order
+            )
+        }
+        js = (
+            "ticketflow/admin-sortable-inline.js",
+            "ticketflow/admin-inline-mark.js",  # adds “⋮⋮” handle & drag cursor
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
         )
 
 

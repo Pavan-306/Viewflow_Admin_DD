@@ -16,6 +16,7 @@ table.tabular.tf-inline td {
   box-sizing: border-box !important;
 }
 
+<<<<<<< HEAD
 /* ===== HIDE the ORDER column visually but keep its field in DOM ===== */
 .inline-group table.tabular th:has(+ th + th + th + th + th + th + th),
 .inline-group table.tabular td:has(> input[name$="-order"]) {
@@ -27,6 +28,8 @@ table.tabular.tf-inline tr.dragging { opacity: .6; }
 
 /* ==================================================================== */
 
+=======
+>>>>>>> fdf29d2f0ac61c6446c9c584273eaf771456bb06
 /* Column widths (after removing ORDER):
    1 Label (drag+label) | 2 Type | 3 Required | 4 Help | 5 Choices | 6 MaxLen
    7 Role | 8 Placeholder | 9 Readonly | 10 Hidden | 11 Delete
